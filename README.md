@@ -97,3 +97,4 @@ cr-election/
 | `localStorage.getItem(...)` | `GET /api/votes` |
 | Votes stored in browser only | Votes stored on server for ALL devices |
 | Each device had separate data | All devices share same data |
+# CR-2026
