@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CR Election 2025 — Secure Voting Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+<!--
+  ╔══════════════════════════════════════════════════════════╗
+  ║  CLERK SETUP — Replace the two placeholders below        ║
+  ║                                                          ║
+  ║  1. Go to https://dashboard.clerk.com                    ║
+  ║  2. Create an application (enable Google + Email OTP)    ║
+  ║  3. Copy your Publishable Key  →  data-clerk-publishable-key  ║
+  ║  4. Copy your Frontend API URL →  src="https://..."      ║
+  ║                                                          ║
+  ║  ── TO RESTRICT GOOGLE SIGN-IN TO YOUR STUDENT EMAILS ── ║
+  ║  Clerk Dashboard → User & Authentication → Restrictions  ║
+  ║  → Allowlist → add every student email address           ║
+  ║  (The app also enforces this check automatically)        ║
+  ╚══════════════════════════════════════════════════════════╝
+-->
+<script
+  async
+  crossorigin="anonymous"
+data-clerk-publishable-key="pk_test_ZW5qb3llZC1mZXJyZXQtMjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+  src="https://enjoyed-ferret-20.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+  type="text/javascript"
+  id="clerk-script">
+</script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="logo-pulse"></div>CR ELECTION 2025</div>
+  <div class="header-right">
+    <div class="election-status active" id="header-status">
+      <div class="status-dot blink"></div><span id="status-text">VOTING OPEN</span>
+    </div>
+    <button class="admin-btn" onclick="openAdmin()">⚙ ADMIN</button>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- STEPS — 6 total (Step 3 only shown for Email OTP path; Google users skip it) -->
+  <div class="steps">
+    <div class="step-item"><div class="step-num active" id="s1">1</div><span class="step-label active">Section</span></div>
+    <div class="step-conn" id="c1"></div>
+    <div class="step-item"><div class="step-num" id="s2">2</div><span class="step-label">Identity</span></div>
+    <div class="step-conn" id="c2"></div>
+    <div class="step-item"><div class="step-num" id="s3">3</div><span class="step-label">OTP</span></div>
+    <div class="step-conn" id="c3"></div>
+    <div class="step-item"><div class="step-num" id="s4">4</div><span class="step-label">Liveness</span></div>
+    <div class="step-conn" id="c4"></div>
+    <div class="step-item"><div class="step-num" id="s5">5</div><span class="step-label">Vote</span></div>
+    <div class="step-conn" id="c5"></div>
+    <div class="step-item"><div class="step-num" id="s6">6</div><span class="step-label">Done</span></div>
+  </div>
+
+  <!-- ── STEP 1: SELECT SECTION ── -->
+  <div class="card active" id="step1">
+    <div class="card-title">Select Your Section</div>
+    <div class="card-sub">Choose your class section to begin voting.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem;">
+      <div class="cand-card" id="sec-alpha" onclick="selectSection('Alpha')" style="padding:2rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:0.8rem;">🔵</div>
+        <div class="cand-name" style="font-size:1.1rem;">Section Alpha</div>
+        <div class="cand-pos" id="alpha-count" style="margin-top:0.4rem;"></div>
+      </div>
+      <div class="cand-card" id="sec-beta" onclick="selectSection('Beta')" style="padding:2rem 1rem;">
+        <div style="font-size:2.5rem;margin-bottom:0.8rem;">🔴</div>
+        <div class="cand-name" style="font-size:1.1rem;">Section Beta</div>
+        <div class="cand-pos" id="beta-count" style="margin-top:0.4rem;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: IDENTITY — Clerk Google OAuth or Email OTP ── -->
+  <div class="card" id="step2">
+    <div class="card-title">Verify Identity</div>
+    <div class="card-sub">Sign in with your registered Google account, or verify via Email OTP.</div>
+    <div class="section-badge alpha" id="section-indicator">● SECTION ALPHA</div>
+
+    <div class="field">
+      <label>Full Name</label>
+      <input type="text" id="inp-name" placeholder="e.g. JIYA KAUSHIK" autocomplete="off">
+      <div class="field-err" id="err-name"></div>
+    </div>
+
+    <!-- Auth method choice (shown first) -->
+    <div id="auth-choice" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin:1.2rem 0 0.4rem;">
+      <button class="btn btn-primary" id="google-btn" onclick="startGoogleSignIn()" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+        <svg width="16" height="16" viewBox="0 0 48 48" style="flex-shrink:0;">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <button class="btn btn-ghost" onclick="showEmailOTPPanel()">📧 Email OTP</button>
+    </div>
+
+    <!-- Email OTP panel (hidden until user clicks "Email OTP") -->
+    <div id="email-otp-panel" style="display:none;margin-top:0.5rem;">
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="inp-email" placeholder="e.g. name@gmail.com" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="send-otp-btn" onclick="verifyIdentity()">
+        <span>Send OTP</span><span>→</span>
+      </button>
+      <button class="btn btn-ghost" onclick="hideEmailOTPPanel()" style="margin-top:0.5rem;">← Back</button>
+    </div>
+
+    <div class="field-err" id="err-contact" style="margin-top:0.7rem;"></div>
+    <div class="status info" id="db-status" style="margin-top:0.8rem;">
+      🔐 <span id="db-count">Loading...</span> students registered in this section
+    </div>
+    <button class="btn btn-ghost" onclick="goToStep(1)" style="margin-top:0.5rem;">← Change Section</button>
+  </div>
+
+  <!-- ── STEP 3: EMAIL OTP (skipped for Google sign-in users) ── -->
+  <div class="card" id="step3">
+    <div class="card-title">OTP Verification</div>
+    <div class="card-sub" id="otp-sub">Sending your OTP...</div>
+    <div class="field">
+      <label>6-Digit OTP</label>
+      <input type="number" id="inp-otp" placeholder="• • • • • •" maxlength="6"
+        style="font-size:1.5rem;letter-spacing:0.3em;text-align:center;"
+        oninput="if(this.value.length>6)this.value=this.value.slice(0,6)">
+      <div class="field-err" id="err-otp"></div>
+    </div>
+    <div id="otp-timer" style="font-size:0.72rem;color:var(--muted2);text-align:center;margin-top:0.5rem;"></div>
+    <button class="btn btn-primary" onclick="verifyOTP()">Verify OTP →</button>
+    <button class="btn btn-ghost" id="resend-btn" onclick="resendOTP()" style="margin-top:0.5rem;" disabled>↺ Resend OTP</button>
+  </div>
+
+  <!-- ── STEP 4: FACE SCAN ── -->
+  <div class="card" id="step4">
+    <div class="card-title">Face Scan</div>
+    <div class="card-sub">Position your face in the oval and press Capture when the green box appears.</div>
+    <div class="cam-wrap" id="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas-preview"></canvas>
+      <div class="cam-overlay" id="cam-overlay"><div class="face-oval"></div></div>
+      <div class="cam-hint" id="cam-hint">Loading camera...</div>
+    </div>
+    <div id="liveness-challenge" class="status info" style="font-size:1rem;text-align:center;justify-content:center;display:none;"></div>
+    <div class="status info" id="face-status" style="display:none;margin-top:0.5rem;"></div>
+    <button class="btn btn-primary" id="capture-btn" onclick="manualCapture()" disabled style="margin-top:0.5rem;">📸 Capture Photo</button>
+    <button class="btn btn-primary" id="proceed-face-btn" onclick="proceedAfterFace()" style="display:none;">Continue →</button>
+    <button class="btn btn-ghost" onclick="retakePhoto()" style="margin-top:0.5rem;">↺ Retry</button>
+  </div>
+
+  <!-- ── STEP 5: VOTE ── -->
+  <div class="card" id="step5">
+    <div class="card-title">Cast Your Vote</div>
+    <div class="card-sub">Select your choice for Class Representative. This action is irreversible.</div>
+    <div class="section-badge alpha" id="vote-section-badge">● SECTION ALPHA</div>
+    <div class="candidates-grid" id="cands-grid"></div>
+    <div class="status warning" id="vote-warn" style="display:none;">⚠ Please select a candidate first.</div>
+    <button class="btn btn-primary" id="submit-btn" onclick="submitVote()">🗳️ Submit My Vote</button>
+  </div>
+
+  <!-- ── STEP 6: SUCCESS ── -->
+  <div class="card" id="step6">
+    <div class="success-wrap">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Vote Recorded!</div>
+      <p style="font-size:0.78rem;color:var(--muted2);line-height:1.7;">Your vote has been cast securely. Thank you for participating in CR Election 2025.</p>
+      <div class="receipt" id="vote-receipt"></div>
+      <div class="status success">✅ Vote verified and stored. One student, one vote — enforced.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADMIN OVERLAY ── -->
+<div class="admin-overlay" id="admin-overlay">
+  <div class="admin-shell">
+    <div class="admin-sidebar" id="admin-sidebar" style="display:none;">
+      <div class="admin-logo">ADMIN PANEL <span>COMPLETE AUTHORITY</span></div>
+      <div class="admin-nav">
+        <div class="nav-section">Overview</div>
+        <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span>Dashboard</div>
+        <div class="nav-item" onclick="showPage('countdown')" id="nav-countdown"><span class="nav-icon">⏱</span>Election Control</div>
+        <div class="nav-section">Election</div>
+        <div class="nav-item" onclick="showPage('candidates')" id="nav-candidates"><span class="nav-icon">👥</span>Candidates</div>
+        <div class="nav-item" onclick="showPage('results')" id="nav-results"><span class="nav-icon">🗳</span>Results</div>
+        <div class="nav-section">Voters</div>
+        <div class="nav-item" onclick="showPage('students')" id="nav-students"><span class="nav-icon">📋</span>Student Database</div>
+        <div class="nav-item" onclick="showPage('faces')" id="nav-faces"><span class="nav-icon">🤖</span>Face Data</div>
+        <div class="nav-section">Security</div>
+        <div class="nav-item" onclick="showPage('fraud')" id="nav-fraud"><span class="nav-icon">🕵️</span>Fraud Detection<span class="nav-badge" id="fraud-badge">0</span></div>
+        <div class="nav-item" onclick="showPage('logs')" id="nav-logs"><span class="nav-icon">📜</span>Activity Log</div>
+        <div class="nav-section">Reports</div>
+        <div class="nav-item" onclick="showPage('export')" id="nav-export"><span class="nav-icon">📂</span>Export &amp; Reports</div>
+        <div class="nav-item" onclick="showPage('settings')" id="nav-settings"><span class="nav-icon">⚙</span>Settings</div>
+      </div>
+      <div class="admin-close">
+        <button class="btn btn-ghost btn-sm" onclick="closeAdmin()" style="width:100%;margin:0;">✕ Close Panel</button>
+      </div>
+    </div>
+
+    <div class="admin-content" id="admin-content-area">
+      <div id="admin-auth">
+        <div class="admin-auth-screen">
+          <div style="font-size:2.5rem;margin-bottom:1rem;">🔐</div>
+          <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">Admin Access</div>
+          <p style="color:var(--muted2);font-size:0.78rem;margin-bottom:1.5rem;">Enter admin password to access the election control panel.</p>
+          <input type="password" id="admin-pass" placeholder="Password" onkeydown="if(event.key==='Enter')checkPass()" style="text-align:center;letter-spacing:0.3em;">
+          <button class="btn btn-primary" onclick="checkPass()">Unlock Panel</button>
+          <p class="field-err" id="pass-err" style="margin-top:0.8rem;display:none;">⛔ Incorrect password</p>
+          <button class="btn btn-ghost" onclick="closeAdmin()" style="margin-top:0.4rem;">Cancel</button>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-dashboard">
+        <div class="page-title">Election Dashboard</div>
+        <div class="page-sub">Real-time overview of both sections</div>
+        <div class="stats-grid" id="dash-stats"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+          <div><div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"><span class="pill alpha">ALPHA</span> Results</div><div class="bar-chart" id="bar-alpha"></div></div>
+          <div><div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"><span class="pill beta">BETA</span> Results</div><div class="bar-chart" id="bar-beta"></div></div>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-countdown">
+        <div class="page-title">Election Control</div>
+        <div class="page-sub">Control the full election lifecycle</div>
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="stat" style="--accent-line:var(--success);--accent-text:var(--success);cursor:pointer;" onclick="setElectionState('active')"><div class="stat-val">▶</div><div class="stat-label">Start</div></div>
+          <div class="stat" style="--accent-line:var(--warning);--accent-text:var(--warning);cursor:pointer;" onclick="setElectionState('paused')"><div class="stat-val">⏸</div><div class="stat-label">Pause</div></div>
+          <div class="stat" style="--accent-line:var(--error);--accent-text:var(--error);cursor:pointer;" onclick="setElectionState('ended')"><div class="stat-val">⏹</div><div class="stat-label">End</div></div>
+        </div>
+        <div class="time-card">
+          <div class="time-card-title">⏰ Schedule</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+            <div><label>Start</label><input type="datetime-local" id="sched-start"></div>
+            <div><label>End</label><input type="datetime-local" id="sched-end"></div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSchedule()" style="max-width:200px;margin-top:1rem;">Save Schedule</button>
+        </div>
+        <div class="countdown" id="countdown-display">
+          <div class="cd-unit"><div class="cd-num" id="cd-h">--</div><div class="cd-label">Hours</div></div>
+          <div class="cd-unit"><div class="cd-num" id="cd-m">--</div><div class="cd-label">Mins</div></div>
+          <div class="cd-unit"><div class="cd-num" id="cd-s">--</div><div class="cd-label">Secs</div></div>
+        </div>
+        <div class="toggle-row"><div class="toggle-info">Lock results until ended<small>Prevent premature viewing</small></div><div class="toggle on" id="tog-lock" onclick="toggleSetting('resultsLocked')"></div></div>
+        <div class="toggle-row"><div class="toggle-info">Reveal results manually<small>Admin clicks to reveal after end</small></div><div class="toggle" id="tog-reveal" onclick="toggleSetting('manualReveal')"></div></div>
+      </div>
+
+      <div class="admin-page" id="page-candidates">
+        <div class="page-title">Candidate Management</div>
+        <div class="page-sub">Add or remove candidates per section</div>
+        <div style="display:flex;gap:0.8rem;margin-bottom:1.2rem;">
+          <span class="pill alpha" style="cursor:pointer;padding:0.4rem 1rem;" onclick="showCandSection('Alpha')">ALPHA</span>
+          <span class="pill beta" style="cursor:pointer;padding:0.4rem 1rem;" onclick="showCandSection('Beta')">BETA</span>
+        </div>
+        <div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:1rem;" id="cand-section-title">Section Alpha Candidates</div>
+        <div id="cand-editor-list"></div>
+        <div class="time-card" style="margin-top:1.5rem;">
+          <div class="time-card-title">➕ Add Candidate</div>
+          <div class="field"><label>Name</label><input type="text" id="new-cand-name" placeholder="Full name"></div>
+          <div class="field"><label>Position</label><input type="text" id="new-cand-pos" placeholder="e.g. CR Nominee"></div>
+          <div class="field"><label>Section</label><div class="select-wrap"><select id="new-cand-sec"><option>Alpha</option><option>Beta</option></select></div></div>
+          <button class="btn btn-primary" onclick="addCandidate()" style="max-width:200px;">Add Candidate</button>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-results">
+        <div class="page-title">Election Results</div>
+        <div class="page-sub">Section-wise vote counts</div>
+        <div id="results-locked-msg" style="display:none;"><div class="status warning" style="margin-bottom:1.5rem;">🔒 Results locked until election ends.</div></div>
+        <div id="results-content">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem;">
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;"><span class="pill alpha">ALPHA</span><span style="font-family:'Syne',sans-serif;font-weight:600;">Results</span></div>
+              <div class="bar-chart" id="results-bar-alpha" style="margin-bottom:1rem;"></div>
+              <div class="status success" id="alpha-winner"></div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;"><span class="pill beta">BETA</span><span style="font-family:'Syne',sans-serif;font-weight:600;">Results</span></div>
+              <div class="bar-chart" id="results-bar-beta" style="margin-bottom:1rem;"></div>
+              <div class="status success" id="beta-winner"></div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="table-head" style="grid-template-columns:1fr 1fr auto;"><div>Section</div><div>Voted For</div><div>Time</div></div>
+            <div id="votes-table"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-students">
+        <div class="page-title">Student Database</div>
+        <div class="page-sub">Add, edit, enable, or disable voters</div>
+        <div class="page-actions">
+          <div class="select-wrap" style="width:140px;"><select id="student-sec-filter" onchange="renderStudentsTable()"><option value="all">All</option><option>Alpha</option><option>Beta</option></select></div>
+          <input type="text" id="student-search" placeholder="Search name or email..." style="flex:1;margin:0;" oninput="renderStudentsTable()">
+          <button class="btn btn-primary btn-sm" onclick="openAddStudent()">+ Add Student</button>
+        </div>
+        <div class="table-wrap">
+          <div class="table-head" style="grid-template-columns:1fr 1fr auto auto auto;"><div>Name</div><div>Email / Section</div><div>Status</div><div>Edit</div><div>Actions</div></div>
+          <div id="students-table"></div>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-faces">
+        <div class="page-title">Face Data Management</div>
+        <div class="page-sub">Biometric records — handle with care</div>
+        <div class="page-actions">
+          <button class="btn btn-danger btn-sm" onclick="deleteAllFaces()">🗑 Delete All</button>
+          <button class="btn btn-ghost btn-sm" onclick="renderFacesTable()">↺ Refresh</button>
+        </div>
+        <div class="status warning">⚠️ Delete face data after the election for privacy compliance.</div>
+        <div class="table-wrap" style="margin-top:1rem;">
+          <div class="table-head" style="grid-template-columns:1fr auto auto auto;"><div>Name</div><div>Descriptor</div><div>Captured</div><div>Action</div></div>
+          <div id="faces-table"></div>
+        </div>
+        <div class="toggle-row" style="margin-top:1rem;"><div class="toggle-info">Auto-delete faces when election ends<small>Recommended for privacy</small></div><div class="toggle on" id="tog-autodel" onclick="toggleSetting('autoDeleteFaces')"></div></div>
+      </div>
+
+      <div class="admin-page" id="page-fraud">
+        <div class="page-title">Fraud Detection</div>
+        <div class="page-sub">Security alerts and suspicious activity</div>
+        <div class="stats-grid" id="fraud-stats"></div>
+        <div id="fraud-list"><div class="table-empty">✅ No fraud attempts</div></div>
+      </div>
+
+      <div class="admin-page" id="page-logs">
+        <div class="page-title">Activity Log</div>
+        <div class="page-sub">Complete audit trail</div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="renderLogs()">↺ Refresh</button>
+          <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear all logs?')){clearLogs();}">🗑 Clear Logs</button>
+        </div>
+        <div id="activity-log"></div>
+      </div>
+
+      <div class="admin-page" id="page-export">
+        <div class="page-title">Export &amp; Reports</div>
+        <div class="page-sub">Download election data</div>
+        <div style="display:grid;gap:1rem;">
+          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📊 Full Results CSV</div><div style="font-size:0.72rem;color:var(--muted2);">Anonymous vote counts</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('full')">Download</button></div>
+          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">🕵️ Fraud Report</div><div style="font-size:0.72rem;color:var(--muted2);">Duplicate/fraud attempts</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('fraud')">Download</button></div>
+          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📈 Turnout Report</div><div style="font-size:0.72rem;color:var(--muted2);">Participation by section</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('turnout')">Download</button></div>
+          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📜 Activity Log CSV</div><div style="font-size:0.72rem;color:var(--muted2);">Full audit trail</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('logs')">Download</button></div>
+        </div>
+      </div>
+
+      <div class="admin-page" id="page-settings">
+        <div class="page-title">Settings &amp; Security</div>
+        <div class="page-sub">System configuration</div>
+        <div class="time-card">
+          <div class="time-card-title">🔑 Change Admin Password</div>
+          <div class="field"><label>Current Password</label><input type="password" id="old-pass" placeholder="Current password"></div>
+          <div class="field"><label>New Password</label><input type="password" id="new-pass" placeholder="New password"></div>
+          <button class="btn btn-primary" onclick="changePass()" style="max-width:200px;">Update Password</button>
+          <div class="field-err" id="pass-change-err" style="margin-top:0.6rem;"></div>
+          <div class="status success" id="pass-change-ok" style="display:none;margin-top:0.6rem;">✅ Password updated</div>
+        </div>
+        <div class="toggle-row"><div class="toggle-info">Enable face duplicate detection<small>Compare biometrics for all voters</small></div><div class="toggle on" id="tog-face" onclick="toggleSetting('faceDetection')"></div></div>
+        <div class="toggle-row"><div class="toggle-info">Session timeout (30 min)<small>Auto-logout admin after inactivity</small></div><div class="toggle on" id="tog-timeout" onclick="toggleSetting('sessionTimeout')"></div></div>
+        <div class="toggle-row"><div class="toggle-info">Show privacy notice<small>Display before face scan</small></div><div class="toggle on" id="tog-privacy" onclick="toggleSetting('privacyNotice')"></div></div>
+        <div class="time-card" style="margin-top:1.5rem;">
+          <div class="time-card-title" style="color:var(--error);">⚠ Danger Zone</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
+            <button class="btn btn-danger btn-sm" style="margin:0;" onclick="resetVotes()">🗑 Reset All Votes</button>
+            <button class="btn btn-danger btn-sm" style="margin:0;" onclick="deleteAllFaces()">🗑 Delete Face Data</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Confirm Action</div>
+    <div class="modal-sub" id="modal-sub"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" style="flex:1;margin:0;" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-sm" style="flex:1;margin:0;" id="modal-confirm-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+
+<!-- Edit/Add Student Modal — at body level so page switching never hides it -->
+<div id="edit-student-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:min(440px,94vw);max-height:90vh;overflow-y:auto;">
+    <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;margin-bottom:1.2rem;" id="edit-student-title">Edit Student</div>
+    <input type="hidden" id="stu-idx">
+    <div class="field"><label>Full Name</label><input type="text" id="stu-name" placeholder="FULL NAME IN CAPS" autocomplete="off"></div>
+    <div class="field"><label>Email Address</label><input type="email" id="stu-email" placeholder="email@gmail.com" autocomplete="off"></div>
+    <div class="field"><label>Section</label>
+      <div class="select-wrap"><select id="stu-section"><option value="Alpha">Alpha</option><option value="Beta">Beta</option></select></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:1.2rem;">
+      <button class="btn btn-primary" style="flex:1;" onclick="saveStudent()">💾 Save</button>
+      <button class="btn btn-ghost" onclick="closeStudentModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
