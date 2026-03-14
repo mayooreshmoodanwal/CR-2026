@@ -15,6 +15,7 @@ let ALPHA_STUDENTS = [
   {name:"ANSHU RAJ BISOYI",               email:"anshurajbisoyi98@gmail.com"},
   {name:"ANUJ SONKAR",                     email:"anujsonkar12bicbly@gmail.com"},
   {name:"ANUSHKA SINGH",                   email:"anushkageetasingh@gmail.com"},
+  {name:"ARPIT SARDA",                     email:"arpitsarda@gmail.com"},
   {name:"ARYAN SINGH",                     email:"aryansinghnea@gmail.com"},
   {name:"AYUSH PANDEY",                    email:"pandeybrand043@gmail.com"},
   {name:"AYUSH KUMAR SINGH",               email:"ayushsingh1772004@gmail.com"},
@@ -427,6 +428,61 @@ async function clerkCreateSignIn(identifier) {
 }
 
 // ════════════════════════════════════════════════════
+//  CLERK EMAIL OTP — SEND
+//
+//  Strategy: use sign-UP email verification, NOT sign-in.
+//  Reason: Clerk sign-in requires a pre-existing account.
+//  Students will never have Clerk accounts. Sign-up email
+//  verification works for any address — Clerk sends the OTP
+//  and then we just verify the code. We don't actually
+//  create a persistent account (we clean up after voting).
+//
+//  Returns the signUp resource (used to verify the OTP).
+// ════════════════════════════════════════════════════
+async function clerkSendEmailOTP(email) {
+  const client = window.Clerk.client;
+  if (!client) throw new Error('Clerk client not initialized');
+
+  // Get the sign-up resource — v5: client.signUp, v4: client.signUps
+  const signUpResource =
+    client.signUp  ??   // Clerk v5
+    client.signUps ??   // Clerk v4
+    null;
+
+  if (!signUpResource) throw new Error('Clerk sign-up API unavailable');
+
+  // Create a sign-up with just the email — Clerk sends an OTP automatically
+  const signUp = await signUpResource.create({
+    emailAddress: email,
+  });
+
+  // Prepare email address verification (sends the OTP email)
+  await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+
+  return signUp; // stored in clerkSignIn state variable for verification step
+}
+
+// ════════════════════════════════════════════════════
+//  CLERK EMAIL OTP — VERIFY
+//
+//  Attempts the email_code verification on the signUp object.
+//  Returns { verified: true } or { verified: false, error: string }
+// ════════════════════════════════════════════════════
+async function clerkVerifyEmailOTP(signUp, code) {
+  try {
+    const result = await signUp.attemptEmailAddressVerification({ code });
+    // status is 'complete' when the email is verified successfully
+    if (result.status === 'complete' || result.verifications?.emailAddress?.status === 'verified') {
+      return { verified: true };
+    }
+    return { verified: false, error: 'Verification incomplete — try again' };
+  } catch (e) {
+    const msg = e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || 'Incorrect OTP';
+    return { verified: false, error: msg };
+  }
+}
+
+// ════════════════════════════════════════════════════
 //  STEP 2 — EMAIL OTP (Clerk email_code strategy)
 // ════════════════════════════════════════════════════
 async function verifyIdentity(){
@@ -492,13 +548,11 @@ async function verifyIdentity(){
       document.getElementById('err-contact').textContent = 'Email OTP service not ready — please refresh';
       return;
     }
-    clerkSignIn = await clerkCreateSignIn(student.email);
-    const emailFactor = clerkSignIn.supportedFirstFactors?.find(f => f.strategy === 'email_code');
-    if (!emailFactor){
-      document.getElementById('err-contact').textContent = 'Email OTP not available for this account — contact admin';
-      return;
-    }
-    await clerkSignIn.prepareFirstFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
+    // Use sign-UP + email verification (not sign-IN).
+    // Students will NOT have pre-existing Clerk accounts, so sign-in always
+    // throws "Couldn't find your account". Sign-up email verification works
+    // for any address regardless of whether a Clerk account exists.
+    clerkSignIn = await clerkSendEmailOTP(student.email);
     document.getElementById('otp-sub').textContent = `OTP sent to ${student.email}`;
 
     await logEvent('IDENTITY_VERIFIED', `Voter verified — Section ${currentSection}`, '✅');
@@ -507,7 +561,7 @@ async function verifyIdentity(){
 
   } catch(e){
     console.error('OTP send error:', e);
-    const msg = e?.errors?.[0]?.message || e?.message || 'Unknown error';
+    const msg = e?.errors?.[0]?.longMessage || e?.errors?.[0]?.message || e?.message || 'Unknown error';
     document.getElementById('err-contact').textContent = 'Failed to send OTP: ' + msg;
   } finally {
     sendBtn.disabled = false;
@@ -549,12 +603,12 @@ async function verifyOTP(){
       document.getElementById('err-otp').textContent = 'Session expired — go back and try again';
       return;
     }
-    const result = await clerkSignIn.attemptFirstFactor({ strategy: 'email_code', code: otpVal });
-    if (result.status !== 'complete'){
-      document.getElementById('err-otp').textContent = 'Verification incomplete — try again';
+    const result = await clerkVerifyEmailOTP(clerkSignIn, otpVal);
+    if (!result.verified){
+      document.getElementById('err-otp').textContent = result.error || 'Verification incomplete — try again';
       return;
     }
-    // Sign out Clerk session — identity confirmed, no persistent session needed
+    // Clean up Clerk session — we only needed it for identity, not persistent login
     await window.Clerk.signOut().catch(() => {});
 
     clearInterval(otpTimerInterval);
@@ -581,11 +635,7 @@ async function resendOTP(){
       document.getElementById('err-otp').textContent = 'Email service unavailable';
       return;
     }
-    clerkSignIn = await clerkCreateSignIn(currentStudent.email);
-    const emailFactor = clerkSignIn.supportedFirstFactors?.find(f => f.strategy === 'email_code');
-    if (emailFactor){
-      await clerkSignIn.prepareFirstFactor({ strategy: 'email_code', emailAddressId: emailFactor.emailAddressId });
-    }
+    clerkSignIn = await clerkSendEmailOTP(currentStudent.email);
     document.getElementById('otp-sub').textContent = 'New OTP sent to ' + currentStudent.email;
     startOTPTimer();
 
