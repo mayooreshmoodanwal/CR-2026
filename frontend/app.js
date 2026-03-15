@@ -110,6 +110,7 @@ let BETA_STUDENTS = [
   {name:"TUSHAR BHOJWANI",                 email:"tusharbhojwani.99@gmail.com"},
   {name:"UJJWAL RAJ",                      email:"ujjwalraj1745@icloud.com"},
   {name:"UTKARSH PATWA",                   email:"utkarshpatwa393@gmail.com"},
+  {name:"VARUN KOHLI",                     email:"varun.kohli@vidyamandir.com"},
   {name:"YARRAGORLA VAMSHI",               email:""},
   {name:"YASH AGGARWAL",                   email:"12yashagarwalhere@gmail.com"},
 ];
