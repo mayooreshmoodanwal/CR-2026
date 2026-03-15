@@ -1,4 +1,4 @@
-# CR Election 2025 — Voting Portal
+# CR Election 2026 — Voting Portal
 
 A secure, multi-device voting system with face detection, fraud prevention, and an admin panel.
 
