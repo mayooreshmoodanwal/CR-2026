@@ -1,99 +1,179 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CR Election 2025 — Secure Voting Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="description" content="Official secure voting portal for CR Election 2025. Cast your vote with biometric verification and live results.">
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- TailwindCSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          display: ['Syne', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace'],
+        },
+        colors: {
+          alpha: { DEFAULT: '#7c6bff', light: 'rgba(124,107,255,0.15)' },
+          beta: { DEFAULT: '#ff5f7e', light: 'rgba(255,95,126,0.15)' },
+          accent3: '#00e5c8',
+        }
+      }
+    }
+  }
+</script>
+
+<!-- Face API -->
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-<!--
-  ╔══════════════════════════════════════════════════════════╗
-  ║  CLERK SETUP — Replace the two placeholders below        ║
-  ║                                                          ║
-  ║  1. Go to https://dashboard.clerk.com                    ║
-  ║  2. Create an application (enable Google + Email OTP)    ║
-  ║  3. Copy your Publishable Key  →  data-clerk-publishable-key  ║
-  ║  4. Copy your Frontend API URL →  src="https://..."      ║
-  ║                                                          ║
-  ║  ── TO RESTRICT GOOGLE SIGN-IN TO YOUR STUDENT EMAILS ── ║
-  ║  Clerk Dashboard → User & Authentication → Restrictions  ║
-  ║  → Allowlist → add every student email address           ║
-  ║  (The app also enforces this check automatically)        ║
-  ╚══════════════════════════════════════════════════════════╝
--->
+<!-- Clerk -->
 <script
   async
   crossorigin="anonymous"
-data-clerk-publishable-key="pk_test_ZW5qb3llZC1mZXJyZXQtMjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
+  data-clerk-publishable-key="pk_test_ZW5qb3llZC1mZXJyZXQtMjAuY2xlcmsuYWNjb3VudHMuZGV2JA"
   src="https://enjoyed-ferret-20.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
   type="text/javascript"
   id="clerk-script">
 </script>
 
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 
-<header>
-  <div class="logo"><div class="logo-pulse"></div>CR ELECTION 2025</div>
-  <div class="header-right">
-    <div class="election-status active" id="header-status">
-      <div class="status-dot blink"></div><span id="status-text">VOTING OPEN</span>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- Stylesheets -->
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="ui.css">
+</head>
+
+<body class="min-h-screen transition-colors duration-500 font-sans">
+
+<!-- ═══════ ANIMATED BACKGROUND ═══════ -->
+<div id="bg-canvas" class="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+  <div class="absolute inset-0 bg-gradient-to-br from-[#060612] via-[#0c0c20] to-[#060612] dark:block hidden"></div>
+  <div class="absolute inset-0 bg-gradient-to-br from-[#f5f6fa] via-[#eceef5] to-[#f5f6fa] dark:hidden block"></div>
+  <div id="particles-container" class="absolute inset-0"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<!-- ═══════ HEADER ═══════ -->
+<header class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/[0.08]">
+  <div class="max-w-6xl mx-auto px-5 sm:px-8 h-[72px] flex items-center justify-between">
+    <!-- Logo -->
+    <div class="flex items-center gap-3">
+      <div class="relative">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-alpha to-purple-400 flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="logo-pulse absolute inset-0 rounded-lg bg-alpha/30 animate-ping"></div>
+      </div>
+      <span class="font-display font-bold text-sm sm:text-base tracking-tight">CR ELECTION 2026</span>
     </div>
-    <button class="admin-btn" onclick="openAdmin()">⚙ ADMIN</button>
+
+    <!-- Right side -->
+    <div class="header-right flex items-center gap-3">
+      <div class="election-status active" id="header-status">
+        <div class="status-dot blink"></div>
+        <span id="status-text" class="text-xs font-semibold tracking-wider">VOTING OPEN</span>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button id="theme-toggle" onclick="toggleTheme()" class="w-9 h-9 rounded-xl glass-card flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300" title="Toggle theme">
+        <svg id="theme-icon-dark" class="w-4 h-4 hidden dark:block text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+        <svg id="theme-icon-light" class="w-4 h-4 block dark:hidden text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+      </button>
+
+      <button class="admin-btn glass-card px-3 py-2 rounded-xl text-xs font-semibold tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all duration-300" onclick="openAdmin()">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        ADMIN
+      </button>
+    </div>
   </div>
 </header>
 
-<div class="app">
+<!-- ═══════ MAIN APP ═══════ -->
+<div class="app pt-28 pb-20 px-4 sm:px-6 max-w-2xl mx-auto">
 
-  <!-- STEPS — 6 total (Step 3 only shown for Email OTP path; Google users skip it) -->
-  <div class="steps">
-    <div class="step-item"><div class="step-num active" id="s1">1</div><span class="step-label active">Section</span></div>
+  <!-- STEP PROGRESS -->
+  <div class="steps flex items-center justify-center gap-0 mb-10" id="steps-container">
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num active" id="s1">1</div>
+      <span class="step-label active">Section</span>
+    </div>
     <div class="step-conn" id="c1"></div>
-    <div class="step-item"><div class="step-num" id="s2">2</div><span class="step-label">Identity</span></div>
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num" id="s2">2</div>
+      <span class="step-label">Identity</span>
+    </div>
     <div class="step-conn" id="c2"></div>
-    <div class="step-item"><div class="step-num" id="s3">3</div><span class="step-label">OTP</span></div>
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num" id="s3">3</div>
+      <span class="step-label">OTP</span>
+    </div>
     <div class="step-conn" id="c3"></div>
-    <div class="step-item"><div class="step-num" id="s4">4</div><span class="step-label">Liveness</span></div>
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num" id="s4">4</div>
+      <span class="step-label">Liveness</span>
+    </div>
     <div class="step-conn" id="c4"></div>
-    <div class="step-item"><div class="step-num" id="s5">5</div><span class="step-label">Vote</span></div>
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num" id="s5">5</div>
+      <span class="step-label">Vote</span>
+    </div>
     <div class="step-conn" id="c5"></div>
-    <div class="step-item"><div class="step-num" id="s6">6</div><span class="step-label">Done</span></div>
+    <div class="step-item flex flex-col items-center">
+      <div class="step-num" id="s6">6</div>
+      <span class="step-label">Done</span>
+    </div>
   </div>
 
   <!-- ── STEP 1: SELECT SECTION ── -->
-  <div class="card active" id="step1">
-    <div class="card-title">Select Your Section</div>
-    <div class="card-sub">Choose your class section to begin voting.</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:0.5rem;">
-      <div class="cand-card" id="sec-alpha" onclick="selectSection('Alpha')" style="padding:2rem 1rem;">
-        <div style="font-size:2.5rem;margin-bottom:0.8rem;">🔵</div>
-        <div class="cand-name" style="font-size:1.1rem;">Section Alpha</div>
-        <div class="cand-pos" id="alpha-count" style="margin-top:0.4rem;"></div>
+  <div class="card active glass-card p-7 sm:p-10 rounded-2xl" id="step1">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4" style="background:var(--accent-glow);color:var(--accent-color);">Step 1 of 6</div>
+      <div class="card-title font-display text-3xl sm:text-4xl font-extrabold mb-3 leading-tight">Select Your Section</div>
+      <div class="card-sub text-sm opacity-50 max-w-sm mx-auto">Choose your class section to begin the secure voting process.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:0.5rem;">
+      <div class="cand-card section-card glass-card rounded-2xl cursor-pointer group" id="sec-alpha" onclick="selectSection('Alpha')" style="padding:2.5rem 1.2rem;">
+        <div class="text-5xl mb-4 group-hover:scale-125 transition-transform duration-500 ease-out">🔵</div>
+        <div class="cand-name font-display font-extrabold text-lg">Section Alpha</div>
+        <div class="cand-pos text-xs opacity-40 mt-2 font-medium" id="alpha-count"></div>
       </div>
-      <div class="cand-card" id="sec-beta" onclick="selectSection('Beta')" style="padding:2rem 1rem;">
-        <div style="font-size:2.5rem;margin-bottom:0.8rem;">🔴</div>
-        <div class="cand-name" style="font-size:1.1rem;">Section Beta</div>
-        <div class="cand-pos" id="beta-count" style="margin-top:0.4rem;"></div>
+      <div class="cand-card section-card glass-card rounded-2xl cursor-pointer group" id="sec-beta" onclick="selectSection('Beta')" style="padding:2.5rem 1.2rem;">
+        <div class="text-5xl mb-4 group-hover:scale-125 transition-transform duration-500 ease-out">🔴</div>
+        <div class="cand-name font-display font-extrabold text-lg">Section Beta</div>
+        <div class="cand-pos text-xs opacity-40 mt-2 font-medium" id="beta-count"></div>
       </div>
     </div>
   </div>
 
-  <!-- ── STEP 2: IDENTITY — Clerk Google OAuth or Email OTP ── -->
-  <div class="card" id="step2">
-    <div class="card-title">Verify Identity</div>
-    <div class="card-sub">Sign in with your registered Google account, or verify via Email OTP.</div>
-    <div class="section-badge alpha" id="section-indicator">● SECTION ALPHA</div>
+  <!-- ── STEP 2: IDENTITY ── -->
+  <div class="card glass-card p-7 sm:p-10 rounded-2xl" id="step2">
+    <div class="card-title font-display text-3xl font-extrabold mb-3">Verify Identity</div>
+    <div class="card-sub text-sm opacity-50 mb-5">Sign in with your registered Google account, or verify via Email OTP.</div>
+    <div class="section-badge alpha inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-4" id="section-indicator">● SECTION ALPHA</div>
 
-    <div class="field">
-      <label>Full Name</label>
-      <input type="text" id="inp-name" placeholder="e.g. JIYA KAUSHIK" autocomplete="off">
-      <div class="field-err" id="err-name"></div>
+    <div class="field mb-4">
+      <label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Full Name</label>
+      <input type="text" id="inp-name" placeholder="e.g. JIYA KAUSHIK" autocomplete="off" class="input-field w-full">
+      <div class="field-err text-xs mt-1" id="err-name"></div>
     </div>
 
-    <!-- Auth method choice (shown first) -->
+    <!-- Auth method choice -->
     <div id="auth-choice" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin:1.2rem 0 0.4rem;">
+      <!-- Google button commented out in original -->
       <!-- <button class="btn btn-primary" id="google-btn" onclick="startGoogleSignIn()" style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">
         <svg width="16" height="16" viewBox="0 0 48 48" style="flex-shrink:0;">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/>
@@ -103,276 +183,303 @@ data-clerk-publishable-key="pk_test_ZW5qb3llZC1mZXJyZXQtMjAuY2xlcmsuYWNjb3VudHMu
         </svg>
         Sign in with Google
       </button> -->
-      <button class="btn btn-ghost" onclick="showEmailOTPPanel()">📧 Email OTP</button>
+      <button class="btn btn-ghost glass-card rounded-xl px-4 py-3 font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300" onclick="showEmailOTPPanel()">📧 Email OTP</button>
     </div>
 
-    <!-- Email OTP panel (hidden until user clicks "Email OTP") -->
+    <!-- Email OTP panel -->
     <div id="email-otp-panel" style="display:none;margin-top:0.5rem;">
-      <div class="field">
-        <label>Email Address</label>
-        <input type="email" id="inp-email" placeholder="e.g. name@gmail.com" autocomplete="off">
+      <div class="field mb-4">
+        <label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Email Address</label>
+        <input type="email" id="inp-email" placeholder="e.g. name@gmail.com" autocomplete="off" class="input-field w-full">
       </div>
-      <button class="btn btn-primary" id="send-otp-btn" onclick="verifyIdentity()">
+      <button class="btn btn-primary w-full rounded-xl py-3 font-semibold text-sm" id="send-otp-btn" onclick="verifyIdentity()">
         <span>Send OTP</span><span>→</span>
       </button>
-      <button class="btn btn-ghost" onclick="hideEmailOTPPanel()" style="margin-top:0.5rem;">← Back</button>
+      <button class="btn btn-ghost w-full rounded-xl py-2.5 font-medium text-sm mt-2" onclick="hideEmailOTPPanel()">← Back</button>
     </div>
 
-    <div class="field-err" id="err-contact" style="margin-top:0.7rem;"></div>
-    <div class="status info" id="db-status" style="margin-top:0.8rem;">
+    <div class="field-err text-xs mt-3" id="err-contact" style="margin-top:0.7rem;"></div>
+    <div class="status info glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2 mt-4" id="db-status" style="margin-top:0.8rem;">
       🔐 <span id="db-count">Loading...</span> students registered in this section
     </div>
-    <button class="btn btn-ghost" onclick="goToStep(1)" style="margin-top:0.5rem;">← Change Section</button>
+    <button class="btn btn-ghost w-full rounded-xl py-2.5 font-medium text-sm mt-3" onclick="goToStep(1)" style="margin-top:0.5rem;">← Change Section</button>
   </div>
 
-  <!-- ── STEP 3: EMAIL OTP (skipped for Google sign-in users) ── -->
-  <div class="card" id="step3">
-    <div class="card-title">OTP Verification</div>
-    <div class="card-sub" id="otp-sub">Sending your OTP...</div>
-    <div class="field">
-      <label>6-Digit OTP</label>
+  <!-- ── STEP 3: EMAIL OTP ── -->
+  <div class="card glass-card p-7 sm:p-10 rounded-2xl" id="step3">
+    <div class="card-title font-display text-3xl font-extrabold mb-3">OTP Verification</div>
+    <div class="card-sub text-sm opacity-50 mb-6" id="otp-sub">Sending your OTP...</div>
+    <div class="field mb-4">
+      <label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">6-Digit OTP</label>
       <input type="number" id="inp-otp" placeholder="• • • • • •" maxlength="6"
+        class="input-field w-full text-center text-2xl tracking-[0.3em]"
         style="font-size:1.5rem;letter-spacing:0.3em;text-align:center;"
         oninput="if(this.value.length>6)this.value=this.value.slice(0,6)">
-      <div class="field-err" id="err-otp"></div>
+      <div class="field-err text-xs mt-1" id="err-otp"></div>
     </div>
     <div id="otp-timer" style="font-size:0.72rem;color:var(--muted2);text-align:center;margin-top:0.5rem;"></div>
-    <button class="btn btn-primary" onclick="verifyOTP()">Verify OTP →</button>
-    <button class="btn btn-ghost" id="resend-btn" onclick="resendOTP()" style="margin-top:0.5rem;" disabled>↺ Resend OTP</button>
+    <button class="btn btn-primary w-full rounded-xl py-3 font-semibold text-sm mt-4" onclick="verifyOTP()">Verify OTP →</button>
+    <button class="btn btn-ghost w-full rounded-xl py-2.5 font-medium text-sm mt-2" id="resend-btn" onclick="resendOTP()" disabled>↺ Resend OTP</button>
   </div>
 
   <!-- ── STEP 4: FACE SCAN ── -->
-  <div class="card" id="step4">
-    <div class="card-title">Face Scan</div>
-    <div class="card-sub">Position your face in the oval and press Capture when the green box appears.</div>
-    <div class="cam-wrap" id="cam-wrap">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="canvas-preview"></canvas>
-      <div class="cam-overlay" id="cam-overlay"><div class="face-oval"></div></div>
-      <div class="cam-hint" id="cam-hint">Loading camera...</div>
+  <div class="card glass-card p-7 sm:p-10 rounded-2xl" id="step4">
+    <div class="card-title font-display text-3xl font-extrabold mb-3">Face Scan</div>
+    <div class="card-sub text-sm opacity-50 mb-5">Position your face in the oval and press Capture when the green box appears.</div>
+    <div class="cam-wrap relative rounded-2xl overflow-hidden aspect-[4/3] bg-black/30" id="cam-wrap">
+      <video id="video" autoplay playsinline muted class="w-full h-full object-cover"></video>
+      <canvas id="canvas-preview" class="w-full h-full object-cover" style="display:none;"></canvas>
+      <div class="cam-overlay absolute inset-0 flex items-center justify-center" id="cam-overlay"><div class="face-oval"></div></div>
+      <div class="cam-hint absolute bottom-3 left-0 right-0 text-center text-xs font-medium px-4 py-1.5" id="cam-hint">Loading camera...</div>
     </div>
     <div id="liveness-challenge" class="status info" style="font-size:1rem;text-align:center;justify-content:center;display:none;"></div>
-    <div class="status info" id="face-status" style="display:none;margin-top:0.5rem;"></div>
-    <button class="btn btn-primary" id="capture-btn" onclick="manualCapture()" disabled style="margin-top:0.5rem;">📸 Capture Photo</button>
-    <button class="btn btn-primary" id="proceed-face-btn" onclick="proceedAfterFace()" style="display:none;">Continue →</button>
-    <button class="btn btn-ghost" onclick="retakePhoto()" style="margin-top:0.5rem;">↺ Retry</button>
+    <div class="status info glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2" id="face-status" style="display:none;margin-top:0.5rem;"></div>
+    <button class="btn btn-primary w-full rounded-xl py-3 font-semibold text-sm mt-3" id="capture-btn" onclick="manualCapture()" disabled style="margin-top:0.5rem;">📸 Capture Photo</button>
+    <button class="btn btn-primary w-full rounded-xl py-3 font-semibold text-sm" id="proceed-face-btn" onclick="proceedAfterFace()" style="display:none;">Continue →</button>
+    <button class="btn btn-ghost w-full rounded-xl py-2.5 font-medium text-sm mt-2" onclick="retakePhoto()" style="margin-top:0.5rem;">↺ Retry</button>
   </div>
 
   <!-- ── STEP 5: VOTE ── -->
-  <div class="card" id="step5">
-    <div class="card-title">Cast Your Vote</div>
-    <div class="card-sub">Select your choice for Class Representative. This action is irreversible.</div>
-    <div class="section-badge alpha" id="vote-section-badge">● SECTION ALPHA</div>
-    <div class="candidates-grid" id="cands-grid"></div>
-    <div class="status warning" id="vote-warn" style="display:none;">⚠ Please select a candidate first.</div>
-    <button class="btn btn-primary" id="submit-btn" onclick="submitVote()">🗳️ Submit My Vote</button>
+  <div class="card glass-card p-7 sm:p-10 rounded-2xl" id="step5">
+    <div class="card-title font-display text-3xl font-extrabold mb-3">Cast Your Vote</div>
+    <div class="card-sub text-sm opacity-50 mb-5">Select your choice for Class Representative. This action is irreversible.</div>
+    <div class="section-badge alpha inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold mb-5" id="vote-section-badge">● SECTION ALPHA</div>
+    <div class="candidates-grid grid grid-cols-1 sm:grid-cols-2 gap-5" id="cands-grid"></div>
+    <div class="status warning glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2 mt-5" id="vote-warn" style="display:none;">⚠ Please select a candidate first.</div>
+    <button class="btn btn-primary w-full rounded-xl py-4 font-bold text-sm mt-5" id="submit-btn" onclick="submitVote()">🗳️ Submit My Vote</button>
   </div>
 
   <!-- ── STEP 6: SUCCESS ── -->
-  <div class="card" id="step6">
-    <div class="success-wrap">
-      <div class="success-icon">✓</div>
-      <div class="success-title">Vote Recorded!</div>
-      <p style="font-size:0.78rem;color:var(--muted2);line-height:1.7;">Your vote has been cast securely. Thank you for participating in CR Election 2025.</p>
-      <div class="receipt" id="vote-receipt"></div>
-      <div class="status success">✅ Vote verified and stored. One student, one vote — enforced.</div>
+  <div class="card glass-card p-7 sm:p-10 rounded-2xl" id="step6">
+    <div class="success-wrap text-center py-6">
+      <div class="success-icon w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-4xl text-white font-bold shadow-xl shadow-green-500/30 mb-6">✓</div>
+      <div class="success-title font-display text-4xl font-extrabold mb-4" style="background:linear-gradient(135deg, var(--success), var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Vote Recorded!</div>
+      <p class="text-sm opacity-45 leading-relaxed max-w-sm mx-auto mb-8">Your vote has been cast securely. Thank you for participating in CR Election 2025.</p>
+      <div class="receipt glass-card rounded-xl p-5 text-left mb-5" id="vote-receipt"></div>
+      <div class="status success glass-card rounded-xl px-4 py-3.5 text-xs flex items-center gap-2 justify-center font-medium">✅ Vote verified and stored. One student, one vote — enforced.</div>
     </div>
   </div>
 </div>
 
-<!-- ── ADMIN OVERLAY ── -->
-<div class="admin-overlay" id="admin-overlay">
-  <div class="admin-shell">
-    <div class="admin-sidebar" id="admin-sidebar" style="display:none;">
-      <div class="admin-logo">ADMIN PANEL <span>COMPLETE AUTHORITY</span></div>
-      <div class="admin-nav">
-        <div class="nav-section">Overview</div>
-        <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span>Dashboard</div>
-        <div class="nav-item" onclick="showPage('countdown')" id="nav-countdown"><span class="nav-icon">⏱</span>Election Control</div>
-        <div class="nav-section">Election</div>
-        <div class="nav-item" onclick="showPage('candidates')" id="nav-candidates"><span class="nav-icon">👥</span>Candidates</div>
-        <div class="nav-item" onclick="showPage('results')" id="nav-results"><span class="nav-icon">🗳</span>Results</div>
-        <div class="nav-section">Voters</div>
-        <div class="nav-item" onclick="showPage('students')" id="nav-students"><span class="nav-icon">📋</span>Student Database</div>
-        <div class="nav-item" onclick="showPage('faces')" id="nav-faces"><span class="nav-icon">🤖</span>Face Data</div>
-        <div class="nav-section">Security</div>
-        <div class="nav-item" onclick="showPage('fraud')" id="nav-fraud"><span class="nav-icon">🕵️</span>Fraud Detection<span class="nav-badge" id="fraud-badge">0</span></div>
-        <div class="nav-item" onclick="showPage('logs')" id="nav-logs"><span class="nav-icon">📜</span>Activity Log</div>
-        <div class="nav-section">Reports</div>
-        <div class="nav-item" onclick="showPage('export')" id="nav-export"><span class="nav-icon">📂</span>Export &amp; Reports</div>
-        <div class="nav-item" onclick="showPage('settings')" id="nav-settings"><span class="nav-icon">⚙</span>Settings</div>
+<!-- ═══════ ADMIN OVERLAY ═══════ -->
+<div class="admin-overlay fixed inset-0 z-[100] pointer-events-none opacity-0 transition-opacity duration-300" id="admin-overlay">
+  <div class="admin-shell flex h-full">
+    <!-- Sidebar -->
+    <div class="admin-sidebar w-64 flex-shrink-0 glass-panel border-r border-white/[0.08] flex flex-col overflow-y-auto" id="admin-sidebar" style="display:none;">
+      <div class="admin-logo p-5 border-b border-white/[0.08]">
+        <div class="font-display font-bold text-sm tracking-wider">ADMIN PANEL</div>
+        <span class="text-[10px] uppercase tracking-widest opacity-40 mt-0.5 block">Complete Authority</span>
       </div>
-      <div class="admin-close">
-        <button class="btn btn-ghost btn-sm" onclick="closeAdmin()" style="width:100%;margin:0;">✕ Close Panel</button>
+      <div class="admin-nav flex-1 py-3 px-3 space-y-0.5">
+        <div class="nav-section text-[10px] uppercase tracking-widest opacity-30 font-semibold px-3 pt-4 pb-1.5">Overview</div>
+        <div class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('dashboard')" id="nav-dashboard"><span class="nav-icon text-base">📊</span>Dashboard</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('countdown')" id="nav-countdown"><span class="nav-icon text-base">⏱</span>Election Control</div>
+        <div class="nav-section text-[10px] uppercase tracking-widest opacity-30 font-semibold px-3 pt-4 pb-1.5">Election</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('candidates')" id="nav-candidates"><span class="nav-icon text-base">👥</span>Candidates</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('results')" id="nav-results"><span class="nav-icon text-base">🗳</span>Results</div>
+        <div class="nav-section text-[10px] uppercase tracking-widest opacity-30 font-semibold px-3 pt-4 pb-1.5">Voters</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('students')" id="nav-students"><span class="nav-icon text-base">📋</span>Student Database</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('faces')" id="nav-faces"><span class="nav-icon text-base">🤖</span>Face Data</div>
+        <div class="nav-section text-[10px] uppercase tracking-widest opacity-30 font-semibold px-3 pt-4 pb-1.5">Security</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('fraud')" id="nav-fraud"><span class="nav-icon text-base">🕵️</span>Fraud Detection<span class="nav-badge ml-auto text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full font-semibold" id="fraud-badge">0</span></div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('logs')" id="nav-logs"><span class="nav-icon text-base">📜</span>Activity Log</div>
+        <div class="nav-section text-[10px] uppercase tracking-widest opacity-30 font-semibold px-3 pt-4 pb-1.5">Reports</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('export')" id="nav-export"><span class="nav-icon text-base">📂</span>Export &amp; Reports</div>
+        <div class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all duration-200" onclick="showPage('settings')" id="nav-settings"><span class="nav-icon text-base">⚙</span>Settings</div>
+      </div>
+      <div class="admin-close p-4 border-t border-white/[0.08]">
+        <button class="btn btn-ghost w-full rounded-xl py-2 text-xs font-semibold" onclick="closeAdmin()">✕ Close Panel</button>
       </div>
     </div>
 
-    <div class="admin-content" id="admin-content-area">
+    <!-- Admin Content -->
+    <div class="admin-content flex-1 overflow-y-auto p-6 sm:p-8" id="admin-content-area">
+      <!-- Auth Screen -->
       <div id="admin-auth">
-        <div class="admin-auth-screen">
-          <div style="font-size:2.5rem;margin-bottom:1rem;">🔐</div>
-          <div style="font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:700;margin-bottom:0.5rem;">Admin Access</div>
-          <p style="color:var(--muted2);font-size:0.78rem;margin-bottom:1.5rem;">Enter admin password to access the election control panel.</p>
-          <input type="password" id="admin-pass" placeholder="Password" onkeydown="if(event.key==='Enter')checkPass()" style="text-align:center;letter-spacing:0.3em;">
-          <button class="btn btn-primary" onclick="checkPass()">Unlock Panel</button>
-          <p class="field-err" id="pass-err" style="margin-top:0.8rem;display:none;">⛔ Incorrect password</p>
-          <button class="btn btn-ghost" onclick="closeAdmin()" style="margin-top:0.4rem;">Cancel</button>
+        <div class="admin-auth-screen flex flex-col items-center justify-center min-h-[60vh] max-w-sm mx-auto text-center">
+          <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-alpha to-purple-400 flex items-center justify-center text-3xl mb-6 shadow-lg shadow-alpha/25">🔐</div>
+          <div class="font-display text-2xl font-bold mb-2">Admin Access</div>
+          <p class="text-sm opacity-50 mb-8">Enter admin password to access the election control panel.</p>
+          <input type="password" id="admin-pass" placeholder="Password" onkeydown="if(event.key==='Enter')checkPass()" class="input-field w-full text-center tracking-[0.3em] mb-3" style="text-align:center;letter-spacing:0.3em;">
+          <button class="btn btn-primary w-full rounded-xl py-3 font-semibold text-sm" onclick="checkPass()">Unlock Panel</button>
+          <p class="field-err text-xs mt-4" id="pass-err" style="display:none;">⛔ Incorrect password</p>
+          <button class="btn btn-ghost w-full rounded-xl py-2 text-xs font-medium mt-2" onclick="closeAdmin()">Cancel</button>
         </div>
       </div>
 
+      <!-- Dashboard Page -->
       <div class="admin-page" id="page-dashboard">
-        <div class="page-title">Election Dashboard</div>
-        <div class="page-sub">Real-time overview of both sections</div>
-        <div class="stats-grid" id="dash-stats"></div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Election Dashboard</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Real-time overview of both sections</div>
+        <div class="stats-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6" id="dash-stats"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-          <div><div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"><span class="pill alpha">ALPHA</span> Results</div><div class="bar-chart" id="bar-alpha"></div></div>
-          <div><div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem;"><span class="pill beta">BETA</span> Results</div><div class="bar-chart" id="bar-beta"></div></div>
+          <div>
+            <div class="font-display font-semibold text-sm mb-3 flex items-center gap-2"><span class="pill alpha">ALPHA</span> Results</div>
+            <div class="bar-chart" id="bar-alpha"></div>
+          </div>
+          <div>
+            <div class="font-display font-semibold text-sm mb-3 flex items-center gap-2"><span class="pill beta">BETA</span> Results</div>
+            <div class="bar-chart" id="bar-beta"></div>
+          </div>
         </div>
       </div>
 
+      <!-- Countdown / Election Control Page -->
       <div class="admin-page" id="page-countdown">
-        <div class="page-title">Election Control</div>
-        <div class="page-sub">Control the full election lifecycle</div>
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-          <div class="stat" style="--accent-line:var(--success);--accent-text:var(--success);cursor:pointer;" onclick="setElectionState('active')"><div class="stat-val">▶</div><div class="stat-label">Start</div></div>
-          <div class="stat" style="--accent-line:var(--warning);--accent-text:var(--warning);cursor:pointer;" onclick="setElectionState('paused')"><div class="stat-val">⏸</div><div class="stat-label">Pause</div></div>
-          <div class="stat" style="--accent-line:var(--error);--accent-text:var(--error);cursor:pointer;" onclick="setElectionState('ended')"><div class="stat-val">⏹</div><div class="stat-label">End</div></div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Election Control</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Control the full election lifecycle</div>
+        <div class="stats-grid grid grid-cols-3 gap-3 mb-6" style="grid-template-columns:repeat(3,1fr);">
+          <div class="stat glass-card rounded-xl p-4 text-center cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all duration-300" style="--accent-line:var(--success);--accent-text:var(--success);" onclick="setElectionState('active')"><div class="stat-val text-2xl">▶</div><div class="stat-label text-xs opacity-60 mt-1">Start</div></div>
+          <div class="stat glass-card rounded-xl p-4 text-center cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all duration-300" style="--accent-line:var(--warning);--accent-text:var(--warning);" onclick="setElectionState('paused')"><div class="stat-val text-2xl">⏸</div><div class="stat-label text-xs opacity-60 mt-1">Pause</div></div>
+          <div class="stat glass-card rounded-xl p-4 text-center cursor-pointer hover:scale-[1.03] active:scale-[0.97] transition-all duration-300" style="--accent-line:var(--error);--accent-text:var(--error);" onclick="setElectionState('ended')"><div class="stat-val text-2xl">⏹</div><div class="stat-label text-xs opacity-60 mt-1">End</div></div>
         </div>
-        <div class="time-card">
-          <div class="time-card-title">⏰ Schedule</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-            <div><label>Start</label><input type="datetime-local" id="sched-start"></div>
-            <div><label>End</label><input type="datetime-local" id="sched-end"></div>
+        <div class="time-card glass-card rounded-xl p-5 mb-4">
+          <div class="time-card-title font-display font-semibold mb-4">⏰ Schedule</div>
+          <div class="grid grid-cols-2 gap-4">
+            <div><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Start</label><input type="datetime-local" id="sched-start" class="input-field w-full"></div>
+            <div><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">End</label><input type="datetime-local" id="sched-end" class="input-field w-full"></div>
           </div>
-          <button class="btn btn-primary" onclick="saveSchedule()" style="max-width:200px;margin-top:1rem;">Save Schedule</button>
+          <button class="btn btn-primary rounded-xl py-2.5 px-6 font-semibold text-sm mt-4" onclick="saveSchedule()" style="max-width:200px;">Save Schedule</button>
         </div>
-        <div class="countdown" id="countdown-display">
-          <div class="cd-unit"><div class="cd-num" id="cd-h">--</div><div class="cd-label">Hours</div></div>
-          <div class="cd-unit"><div class="cd-num" id="cd-m">--</div><div class="cd-label">Mins</div></div>
-          <div class="cd-unit"><div class="cd-num" id="cd-s">--</div><div class="cd-label">Secs</div></div>
+        <div class="countdown flex items-center justify-center gap-4 my-6" id="countdown-display">
+          <div class="cd-unit text-center"><div class="cd-num font-mono text-3xl font-bold" id="cd-h">--</div><div class="cd-label text-[10px] uppercase tracking-widest opacity-40 mt-1">Hours</div></div>
+          <div class="text-2xl opacity-20 font-light">:</div>
+          <div class="cd-unit text-center"><div class="cd-num font-mono text-3xl font-bold" id="cd-m">--</div><div class="cd-label text-[10px] uppercase tracking-widest opacity-40 mt-1">Mins</div></div>
+          <div class="text-2xl opacity-20 font-light">:</div>
+          <div class="cd-unit text-center"><div class="cd-num font-mono text-3xl font-bold" id="cd-s">--</div><div class="cd-label text-[10px] uppercase tracking-widest opacity-40 mt-1">Secs</div></div>
         </div>
-        <div class="toggle-row"><div class="toggle-info">Lock results until ended<small>Prevent premature viewing</small></div><div class="toggle on" id="tog-lock" onclick="toggleSetting('resultsLocked')"></div></div>
-        <div class="toggle-row"><div class="toggle-info">Reveal results manually<small>Admin clicks to reveal after end</small></div><div class="toggle" id="tog-reveal" onclick="toggleSetting('manualReveal')"></div></div>
+        <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between mb-2"><div class="toggle-info"><div class="text-sm font-medium">Lock results until ended</div><small class="text-xs opacity-40">Prevent premature viewing</small></div><div class="toggle on" id="tog-lock" onclick="toggleSetting('resultsLocked')"></div></div>
+        <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between"><div class="toggle-info"><div class="text-sm font-medium">Reveal results manually</div><small class="text-xs opacity-40">Admin clicks to reveal after end</small></div><div class="toggle" id="tog-reveal" onclick="toggleSetting('manualReveal')"></div></div>
       </div>
 
+      <!-- Candidates Page -->
       <div class="admin-page" id="page-candidates">
-        <div class="page-title">Candidate Management</div>
-        <div class="page-sub">Add or remove candidates per section</div>
-        <div style="display:flex;gap:0.8rem;margin-bottom:1.2rem;">
-          <span class="pill alpha" style="cursor:pointer;padding:0.4rem 1rem;" onclick="showCandSection('Alpha')">ALPHA</span>
-          <span class="pill beta" style="cursor:pointer;padding:0.4rem 1rem;" onclick="showCandSection('Beta')">BETA</span>
+        <div class="page-title font-display text-2xl font-bold mb-1">Candidate Management</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Add or remove candidates per section</div>
+        <div class="flex gap-2 mb-5">
+          <span class="pill alpha cursor-pointer px-4 py-1.5 rounded-full text-xs font-semibold" onclick="showCandSection('Alpha')">ALPHA</span>
+          <span class="pill beta cursor-pointer px-4 py-1.5 rounded-full text-xs font-semibold" onclick="showCandSection('Beta')">BETA</span>
         </div>
-        <div style="font-family:'Syne',sans-serif;font-weight:600;margin-bottom:1rem;" id="cand-section-title">Section Alpha Candidates</div>
-        <div id="cand-editor-list"></div>
-        <div class="time-card" style="margin-top:1.5rem;">
-          <div class="time-card-title">➕ Add Candidate</div>
-          <div class="field"><label>Name</label><input type="text" id="new-cand-name" placeholder="Full name"></div>
-          <div class="field"><label>Position</label><input type="text" id="new-cand-pos" placeholder="e.g. CR Nominee"></div>
-          <div class="field"><label>Section</label><div class="select-wrap"><select id="new-cand-sec"><option>Alpha</option><option>Beta</option></select></div></div>
-          <button class="btn btn-primary" onclick="addCandidate()" style="max-width:200px;">Add Candidate</button>
+        <div class="font-display font-semibold mb-4" id="cand-section-title">Section Alpha Candidates</div>
+        <div id="cand-editor-list" class="space-y-2"></div>
+        <div class="time-card glass-card rounded-xl p-5 mt-6">
+          <div class="time-card-title font-display font-semibold mb-4">➕ Add Candidate</div>
+          <div class="field mb-3"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Name</label><input type="text" id="new-cand-name" placeholder="Full name" class="input-field w-full"></div>
+          <div class="field mb-3"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Position</label><input type="text" id="new-cand-pos" placeholder="e.g. CR Nominee" class="input-field w-full"></div>
+          <div class="field mb-4"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Section</label><div class="select-wrap"><select id="new-cand-sec" class="input-field w-full"><option>Alpha</option><option>Beta</option></select></div></div>
+          <button class="btn btn-primary rounded-xl py-2.5 px-6 font-semibold text-sm" onclick="addCandidate()" style="max-width:200px;">Add Candidate</button>
         </div>
       </div>
 
+      <!-- Results Page -->
       <div class="admin-page" id="page-results">
-        <div class="page-title">Election Results</div>
-        <div class="page-sub">Section-wise vote counts</div>
-        <div id="results-locked-msg" style="display:none;"><div class="status warning" style="margin-bottom:1.5rem;">🔒 Results locked until election ends.</div></div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Election Results</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Section-wise vote counts</div>
+        <div id="results-locked-msg" style="display:none;"><div class="status warning glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2 mb-6">🔒 Results locked until election ends.</div></div>
         <div id="results-content">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem;">
+          <div class="grid grid-cols-2 gap-6 mb-8">
             <div>
-              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;"><span class="pill alpha">ALPHA</span><span style="font-family:'Syne',sans-serif;font-weight:600;">Results</span></div>
+              <div class="flex items-center gap-2 mb-4"><span class="pill alpha">ALPHA</span><span class="font-display font-semibold text-sm">Results</span></div>
               <div class="bar-chart" id="results-bar-alpha" style="margin-bottom:1rem;"></div>
-              <div class="status success" id="alpha-winner"></div>
+              <div class="status success glass-card rounded-xl px-4 py-3 text-xs" id="alpha-winner"></div>
             </div>
             <div>
-              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;"><span class="pill beta">BETA</span><span style="font-family:'Syne',sans-serif;font-weight:600;">Results</span></div>
+              <div class="flex items-center gap-2 mb-4"><span class="pill beta">BETA</span><span class="font-display font-semibold text-sm">Results</span></div>
               <div class="bar-chart" id="results-bar-beta" style="margin-bottom:1rem;"></div>
-              <div class="status success" id="beta-winner"></div>
+              <div class="status success glass-card rounded-xl px-4 py-3 text-xs" id="beta-winner"></div>
             </div>
           </div>
-          <div class="table-wrap">
+          <div class="table-wrap glass-card rounded-xl overflow-hidden">
             <div class="table-head" style="grid-template-columns:1fr 1fr auto;"><div>Section</div><div>Voted For</div><div>Time</div></div>
             <div id="votes-table"></div>
           </div>
         </div>
       </div>
 
+      <!-- Students Page -->
       <div class="admin-page" id="page-students">
-        <div class="page-title">Student Database</div>
-        <div class="page-sub">Add, edit, enable, or disable voters</div>
-        <div class="page-actions">
-          <div class="select-wrap" style="width:140px;"><select id="student-sec-filter" onchange="renderStudentsTable()"><option value="all">All</option><option>Alpha</option><option>Beta</option></select></div>
-          <input type="text" id="student-search" placeholder="Search name or email..." style="flex:1;margin:0;" oninput="renderStudentsTable()">
-          <button class="btn btn-primary btn-sm" onclick="openAddStudent()">+ Add Student</button>
+        <div class="page-title font-display text-2xl font-bold mb-1">Student Database</div>
+        <div class="page-sub text-sm opacity-50 mb-5">Add, edit, enable, or disable voters</div>
+        <div class="page-actions flex flex-wrap items-center gap-3 mb-4">
+          <div class="select-wrap" style="width:140px;"><select id="student-sec-filter" onchange="renderStudentsTable()" class="input-field w-full"><option value="all">All</option><option>Alpha</option><option>Beta</option></select></div>
+          <input type="text" id="student-search" placeholder="Search name or email..." class="input-field flex-1" style="flex:1;margin:0;" oninput="renderStudentsTable()">
+          <button class="btn btn-primary rounded-xl py-2 px-4 text-xs font-semibold" onclick="openAddStudent()">+ Add Student</button>
         </div>
-        <div class="table-wrap">
-          <div class="table-head" style="grid-template-columns:1fr 1fr auto auto auto;"><div>Name</div><div>Email / Section</div><div>Status</div><div>Edit</div><div>Actions</div></div>
+        <div class="table-wrap glass-card rounded-xl overflow-hidden">
+          <div class="table-head student-table-grid"><div>Name</div><div>Email / Section</div><div>Status</div><div>Edit</div><div>Actions</div></div>
           <div id="students-table"></div>
         </div>
       </div>
 
+      <!-- Faces Page -->
       <div class="admin-page" id="page-faces">
-        <div class="page-title">Face Data Management</div>
-        <div class="page-sub">Biometric records — handle with care</div>
-        <div class="page-actions">
-          <button class="btn btn-danger btn-sm" onclick="deleteAllFaces()">🗑 Delete All</button>
-          <button class="btn btn-ghost btn-sm" onclick="renderFacesTable()">↺ Refresh</button>
+        <div class="page-title font-display text-2xl font-bold mb-1">Face Data Management</div>
+        <div class="page-sub text-sm opacity-50 mb-5">Biometric records — handle with care</div>
+        <div class="page-actions flex items-center gap-3 mb-4">
+          <button class="btn btn-danger rounded-xl py-2 px-4 text-xs font-semibold" onclick="deleteAllFaces()">🗑 Delete All</button>
+          <button class="btn btn-ghost rounded-xl py-2 px-4 text-xs font-semibold" onclick="renderFacesTable()">↺ Refresh</button>
         </div>
-        <div class="status warning">⚠️ Delete face data after the election for privacy compliance.</div>
-        <div class="table-wrap" style="margin-top:1rem;">
+        <div class="status warning glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2 mb-4">⚠️ Delete face data after the election for privacy compliance.</div>
+        <div class="table-wrap glass-card rounded-xl overflow-hidden" style="margin-top:1rem;">
           <div class="table-head" style="grid-template-columns:1fr auto auto auto;"><div>Name</div><div>Descriptor</div><div>Captured</div><div>Action</div></div>
           <div id="faces-table"></div>
         </div>
-        <div class="toggle-row" style="margin-top:1rem;"><div class="toggle-info">Auto-delete faces when election ends<small>Recommended for privacy</small></div><div class="toggle on" id="tog-autodel" onclick="toggleSetting('autoDeleteFaces')"></div></div>
+        <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between mt-4" style="margin-top:1rem;"><div class="toggle-info"><div class="text-sm font-medium">Auto-delete faces when election ends</div><small class="text-xs opacity-40">Recommended for privacy</small></div><div class="toggle on" id="tog-autodel" onclick="toggleSetting('autoDeleteFaces')"></div></div>
       </div>
 
+      <!-- Fraud Page -->
       <div class="admin-page" id="page-fraud">
-        <div class="page-title">Fraud Detection</div>
-        <div class="page-sub">Security alerts and suspicious activity</div>
-        <div class="stats-grid" id="fraud-stats"></div>
-        <div id="fraud-list"><div class="table-empty">✅ No fraud attempts</div></div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Fraud Detection</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Security alerts and suspicious activity</div>
+        <div class="stats-grid grid grid-cols-3 gap-3 mb-6" id="fraud-stats"></div>
+        <div id="fraud-list"><div class="table-empty text-center py-8 opacity-40 text-sm">✅ No fraud attempts</div></div>
       </div>
 
+      <!-- Logs Page -->
       <div class="admin-page" id="page-logs">
-        <div class="page-title">Activity Log</div>
-        <div class="page-sub">Complete audit trail</div>
-        <div class="page-actions">
-          <button class="btn btn-ghost btn-sm" onclick="renderLogs()">↺ Refresh</button>
-          <button class="btn btn-danger btn-sm" onclick="if(confirm('Clear all logs?')){clearLogs();}">🗑 Clear Logs</button>
+        <div class="page-title font-display text-2xl font-bold mb-1">Activity Log</div>
+        <div class="page-sub text-sm opacity-50 mb-5">Complete audit trail</div>
+        <div class="page-actions flex items-center gap-3 mb-4">
+          <button class="btn btn-ghost rounded-xl py-2 px-4 text-xs font-semibold" onclick="renderLogs()">↺ Refresh</button>
+          <button class="btn btn-danger rounded-xl py-2 px-4 text-xs font-semibold" onclick="if(confirm('Clear all logs?')){clearLogs();}">🗑 Clear Logs</button>
         </div>
-        <div id="activity-log"></div>
+        <div id="activity-log" class="space-y-2"></div>
       </div>
 
+      <!-- Export Page -->
       <div class="admin-page" id="page-export">
-        <div class="page-title">Export &amp; Reports</div>
-        <div class="page-sub">Download election data</div>
-        <div style="display:grid;gap:1rem;">
-          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📊 Full Results CSV</div><div style="font-size:0.72rem;color:var(--muted2);">Anonymous vote counts</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('full')">Download</button></div>
-          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">🕵️ Fraud Report</div><div style="font-size:0.72rem;color:var(--muted2);">Duplicate/fraud attempts</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('fraud')">Download</button></div>
-          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📈 Turnout Report</div><div style="font-size:0.72rem;color:var(--muted2);">Participation by section</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('turnout')">Download</button></div>
-          <div class="time-card" style="display:flex;align-items:center;justify-content:space-between;"><div><div style="font-family:'Syne',sans-serif;font-weight:600;">📜 Activity Log CSV</div><div style="font-size:0.72rem;color:var(--muted2);">Full audit trail</div></div><button class="btn btn-ghost btn-sm" onclick="exportCSV('logs')">Download</button></div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Export &amp; Reports</div>
+        <div class="page-sub text-sm opacity-50 mb-6">Download election data</div>
+        <div class="space-y-3">
+          <div class="time-card glass-card rounded-xl p-4 flex items-center justify-between"><div><div class="font-display font-semibold text-sm">📊 Full Results CSV</div><div class="text-xs opacity-40 mt-0.5">Anonymous vote counts</div></div><button class="btn btn-ghost rounded-lg py-1.5 px-4 text-xs font-semibold" onclick="exportCSV('full')">Download</button></div>
+          <div class="time-card glass-card rounded-xl p-4 flex items-center justify-between"><div><div class="font-display font-semibold text-sm">🕵️ Fraud Report</div><div class="text-xs opacity-40 mt-0.5">Duplicate/fraud attempts</div></div><button class="btn btn-ghost rounded-lg py-1.5 px-4 text-xs font-semibold" onclick="exportCSV('fraud')">Download</button></div>
+          <div class="time-card glass-card rounded-xl p-4 flex items-center justify-between"><div><div class="font-display font-semibold text-sm">📈 Turnout Report</div><div class="text-xs opacity-40 mt-0.5">Participation by section</div></div><button class="btn btn-ghost rounded-lg py-1.5 px-4 text-xs font-semibold" onclick="exportCSV('turnout')">Download</button></div>
+          <div class="time-card glass-card rounded-xl p-4 flex items-center justify-between"><div><div class="font-display font-semibold text-sm">📜 Activity Log CSV</div><div class="text-xs opacity-40 mt-0.5">Full audit trail</div></div><button class="btn btn-ghost rounded-lg py-1.5 px-4 text-xs font-semibold" onclick="exportCSV('logs')">Download</button></div>
         </div>
       </div>
 
+      <!-- Settings Page -->
       <div class="admin-page" id="page-settings">
-        <div class="page-title">Settings &amp; Security</div>
-        <div class="page-sub">System configuration</div>
-        <div class="time-card">
-          <div class="time-card-title">🔑 Change Admin Password</div>
-          <div class="field"><label>Current Password</label><input type="password" id="old-pass" placeholder="Current password"></div>
-          <div class="field"><label>New Password</label><input type="password" id="new-pass" placeholder="New password"></div>
-          <button class="btn btn-primary" onclick="changePass()" style="max-width:200px;">Update Password</button>
-          <div class="field-err" id="pass-change-err" style="margin-top:0.6rem;"></div>
-          <div class="status success" id="pass-change-ok" style="display:none;margin-top:0.6rem;">✅ Password updated</div>
+        <div class="page-title font-display text-2xl font-bold mb-1">Settings &amp; Security</div>
+        <div class="page-sub text-sm opacity-50 mb-6">System configuration</div>
+        <div class="time-card glass-card rounded-xl p-5 mb-4">
+          <div class="time-card-title font-display font-semibold mb-4">🔑 Change Admin Password</div>
+          <div class="field mb-3"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Current Password</label><input type="password" id="old-pass" placeholder="Current password" class="input-field w-full"></div>
+          <div class="field mb-4"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">New Password</label><input type="password" id="new-pass" placeholder="New password" class="input-field w-full"></div>
+          <button class="btn btn-primary rounded-xl py-2.5 px-6 font-semibold text-sm" onclick="changePass()" style="max-width:200px;">Update Password</button>
+          <div class="field-err text-xs mt-3" id="pass-change-err" style="margin-top:0.6rem;"></div>
+          <div class="status success glass-card rounded-xl px-4 py-3 text-xs flex items-center gap-2 mt-3" id="pass-change-ok" style="display:none;margin-top:0.6rem;">✅ Password updated</div>
         </div>
-        <div class="toggle-row"><div class="toggle-info">Enable face duplicate detection<small>Compare biometrics for all voters</small></div><div class="toggle on" id="tog-face" onclick="toggleSetting('faceDetection')"></div></div>
-        <div class="toggle-row"><div class="toggle-info">Session timeout (30 min)<small>Auto-logout admin after inactivity</small></div><div class="toggle on" id="tog-timeout" onclick="toggleSetting('sessionTimeout')"></div></div>
-        <div class="toggle-row"><div class="toggle-info">Show privacy notice<small>Display before face scan</small></div><div class="toggle on" id="tog-privacy" onclick="toggleSetting('privacyNotice')"></div></div>
-        <div class="time-card" style="margin-top:1.5rem;">
-          <div class="time-card-title" style="color:var(--error);">⚠ Danger Zone</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;">
-            <button class="btn btn-danger btn-sm" style="margin:0;" onclick="resetVotes()">🗑 Reset All Votes</button>
-            <button class="btn btn-danger btn-sm" style="margin:0;" onclick="deleteAllFaces()">🗑 Delete Face Data</button>
+        <div class="space-y-2 mb-4">
+          <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between"><div class="toggle-info"><div class="text-sm font-medium">Enable face duplicate detection</div><small class="text-xs opacity-40">Compare biometrics for all voters</small></div><div class="toggle on" id="tog-face" onclick="toggleSetting('faceDetection')"></div></div>
+          <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between"><div class="toggle-info"><div class="text-sm font-medium">Session timeout (30 min)</div><small class="text-xs opacity-40">Auto-logout admin after inactivity</small></div><div class="toggle on" id="tog-timeout" onclick="toggleSetting('sessionTimeout')"></div></div>
+          <div class="toggle-row glass-card rounded-xl p-4 flex items-center justify-between"><div class="toggle-info"><div class="text-sm font-medium">Show privacy notice</div><small class="text-xs opacity-40">Display before face scan</small></div><div class="toggle on" id="tog-privacy" onclick="toggleSetting('privacyNotice')"></div></div>
+        </div>
+        <div class="time-card glass-card rounded-xl p-5" style="margin-top:1.5rem;">
+          <div class="time-card-title font-display font-semibold mb-4 text-red-400" style="color:var(--error);">⚠ Danger Zone</div>
+          <div class="grid grid-cols-2 gap-3">
+            <button class="btn btn-danger rounded-xl py-2.5 text-xs font-semibold" style="margin:0;" onclick="resetVotes()">🗑 Reset All Votes</button>
+            <button class="btn btn-danger rounded-xl py-2.5 text-xs font-semibold" style="margin:0;" onclick="deleteAllFaces()">🗑 Delete Face Data</button>
           </div>
         </div>
       </div>
@@ -380,35 +487,40 @@ data-clerk-publishable-key="pk_test_ZW5qb3llZC1mZXJyZXQtMjAuY2xlcmsuYWNjb3VudHMu
   </div>
 </div>
 
-<div class="modal-overlay" id="confirm-modal">
-  <div class="modal">
-    <div class="modal-title" id="modal-title">Confirm Action</div>
-    <div class="modal-sub" id="modal-sub"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost btn-sm" style="flex:1;margin:0;" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-danger btn-sm" style="flex:1;margin:0;" id="modal-confirm-btn">Confirm</button>
+<!-- ═══════ CONFIRM MODAL ═══════ -->
+<div class="modal-overlay fixed inset-0 z-[200] flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300" id="confirm-modal">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+  <div class="modal glass-card rounded-2xl p-6 max-w-sm w-[90vw] relative z-10 transform scale-95 transition-transform duration-300">
+    <div class="modal-title font-display text-lg font-bold mb-2" id="modal-title">Confirm Action</div>
+    <div class="modal-sub text-sm opacity-50 mb-6" id="modal-sub"></div>
+    <div class="modal-actions flex gap-3">
+      <button class="btn btn-ghost flex-1 rounded-xl py-2.5 text-sm font-semibold" style="flex:1;margin:0;" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger flex-1 rounded-xl py-2.5 text-sm font-semibold" style="flex:1;margin:0;" id="modal-confirm-btn">Confirm</button>
     </div>
   </div>
 </div>
 
-<script src="app.js"></script>
-
-<!-- Edit/Add Student Modal — at body level so page switching never hides it -->
-<div id="edit-student-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:min(440px,94vw);max-height:90vh;overflow-y:auto;">
-    <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;margin-bottom:1.2rem;" id="edit-student-title">Edit Student</div>
+<!-- ═══════ EDIT STUDENT MODAL ═══════ -->
+<div id="edit-student-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;" class="backdrop-blur-sm">
+  <div class="glass-card rounded-2xl p-6 sm:p-8 w-[min(440px,94vw)] max-h-[90vh] overflow-y-auto" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:min(440px,94vw);max-height:90vh;overflow-y:auto;">
+    <div class="font-display text-xl font-bold mb-5" id="edit-student-title">Edit Student</div>
     <input type="hidden" id="stu-idx">
-    <div class="field"><label>Full Name</label><input type="text" id="stu-name" placeholder="FULL NAME IN CAPS" autocomplete="off"></div>
-    <div class="field"><label>Email Address</label><input type="email" id="stu-email" placeholder="email@gmail.com" autocomplete="off"></div>
-    <div class="field"><label>Section</label>
-      <div class="select-wrap"><select id="stu-section"><option value="Alpha">Alpha</option><option value="Beta">Beta</option></select></div>
+    <div class="field mb-3"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Full Name</label><input type="text" id="stu-name" placeholder="FULL NAME IN CAPS" autocomplete="off" class="input-field w-full"></div>
+    <div class="field mb-3"><label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Email Address</label><input type="email" id="stu-email" placeholder="email@gmail.com" autocomplete="off" class="input-field w-full"></div>
+    <div class="field mb-5">
+      <label class="block text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">Section</label>
+      <div class="select-wrap"><select id="stu-section" class="input-field w-full"><option value="Alpha">Alpha</option><option value="Beta">Beta</option></select></div>
     </div>
-    <div style="display:flex;gap:0.5rem;margin-top:1.2rem;">
-      <button class="btn btn-primary" style="flex:1;" onclick="saveStudent()">💾 Save</button>
-      <button class="btn btn-ghost" onclick="closeStudentModal()">Cancel</button>
+    <div class="flex gap-3">
+      <button class="btn btn-primary flex-1 rounded-xl py-2.5 font-semibold text-sm" style="flex:1;" onclick="saveStudent()">💾 Save</button>
+      <button class="btn btn-ghost rounded-xl py-2.5 px-6 font-semibold text-sm" onclick="closeStudentModal()">Cancel</button>
     </div>
   </div>
 </div>
+
+<!-- SCRIPTS -->
+<script src="app.js"></script>
+<script src="components.js"></script>
 
 </body>
 </html>

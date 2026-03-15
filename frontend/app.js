@@ -945,16 +945,72 @@ function goToStep(n){
 // ════════════════════════════════════════════════════
 let adminAuthed=false;
 
-function openAdmin(){document.getElementById('admin-overlay').classList.add('open');if(!adminAuthed)showAuthScreen();else{showAdminUI();showPage('dashboard');}}
+function openAdmin(){
+
+  const overlay = document.getElementById("admin-overlay");
+  const pass = document.getElementById("admin-pass");
+  const err = document.getElementById("pass-err");
+
+  overlay.classList.add("open");
+
+  pass.value = "";
+  err.style.display = "none";
+
+  if(!adminAuthed){
+      showAuthScreen();
+  }else{
+      showAdminUI();
+      showPage("dashboard");
+  }
+
+}
 function closeAdmin(){document.getElementById('admin-overlay').classList.remove('open');}
-function showAuthScreen(){document.getElementById('admin-auth').style.display='block';document.getElementById('admin-sidebar').style.display='none';}
+function showAuthScreen(){
+  document.getElementById('admin-auth').style.display='block';
+  document.getElementById('admin-sidebar').style.display='none';
+
+  document.getElementById('pass-err').style.display='none';
+  document.getElementById('admin-pass').value='';
+}
 function showAdminUI(){document.getElementById('admin-auth').style.display='none';document.getElementById('admin-sidebar').style.display='flex';}
 
 async function checkPass(){
-  const p=document.getElementById('admin-pass').value;
-  settings=await loadSettings();
-  if(hashStr(p)===settings.adminPass){adminAuthed=true;showAdminUI();showPage('dashboard');await logEvent('ADMIN_LOGIN','Admin panel accessed','🔐');}
-  else{document.getElementById('pass-err').style.display='block';await logEvent('ADMIN_FAIL','Wrong password attempt','⚠️');}
+
+  const input = document.getElementById("admin-pass");
+  const err = document.getElementById("pass-err");
+
+  const password = input.value.trim();
+
+  // hide error first
+  err.style.display = "none";
+
+  // do nothing if empty
+  if(password === ""){
+    return;
+  }
+
+  settings = await loadSettings();
+
+  if(hashStr(password) === settings.adminPass){
+
+      adminAuthed = true;
+      showAdminUI();
+      showPage("dashboard");
+
+      err.style.display = "none";
+      input.value = "";
+
+      await logEvent("ADMIN_LOGIN","Admin panel accessed","🔐");
+
+  }else{
+
+      err.style.display = "block";
+      input.value = "";
+
+      await logEvent("ADMIN_FAIL","Wrong password attempt","⚠️");
+
+  }
+
 }
 
 async function showPage(page){
@@ -1112,7 +1168,7 @@ async function renderStudentsTable(){
     const isDisabled=disabled.includes(em);
     const hasVoted=votes.find(v=>v.email&&v.email===em);
     const idx=all.findIndex(x=>x.name===s.name&&x.section===s.section);
-    return `<div class="table-row" style="grid-template-columns:1fr 1fr auto auto auto;">
+    return `<div class="table-row student-table-grid">
       <div><strong>${s.name}</strong></div>
       <div style="font-size:0.68rem;color:var(--muted2);">${s.email||'—'}<div><span class="pill ${s.section.toLowerCase()}">${s.section}</span></div></div>
       <div>${hasVoted?'<span class="pill success">Voted</span>':isDisabled?'<span class="pill danger">Disabled</span>':'<span class="pill muted">Pending</span>'}</div>
